@@ -14,3 +14,5 @@
 ##### *Lưu ý: nếu đang xem dở phim/thấy một trang web hiện ra mà không đóng lại ngay, hãy vào trang web bấm nút để xem tiếp phim. Khi đó trang web sẽ tự đóng và extension sẽ chạy tiếp*
 #### 7. Một file mặc định download.js sẽ được tải về máy. Trong file chứa các file segment sẵn sàng tải xuống.
 #### 8. Tải phim bằng cách sử dụng NodeJS trong terminal với lệnh `node đường_dẫn/download.js` (VD: `node /Users/Downloads/download.js`). Khi đó phim sẽ được tải về và hiện trạng thái trên terminal.
+
+### Lưu ý 2: Trong trường hợp sau khi tải xong 1 bộ => tìm kiếm bộ khác => tải xuống, gặp tình trạng link vẫn như cũ thì hãy thử vào Extension ấn reload (hình mũi tên vòng tròn) và thử lại.
