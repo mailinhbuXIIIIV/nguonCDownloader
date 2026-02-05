@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <style>
+        body { font-family: sans-serif; padding: 10px; background: #f9f9f9; }
+        .search-box { display: flex; gap: 5px; margin-bottom: 15px; }
+        input { flex: 1; padding: 8px; border: 1px solid #ddd; border-radius: 4px; }
+        button { cursor: pointer; padding: 8px; background: #007AFF; color: white; border: none; border-radius: 4px; }
+        .movie-card { background: white; border: 1px solid #eee; margin-bottom: 10px; padding: 8px; border-radius: 8px; display: flex; gap: 10px; cursor: pointer; }
+        .movie-card img { width: 60px; height: 80px; object-fit: cover; border-radius: 4px; }
+        .episodes-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; margin-top: 10px; }
+        .ep-btn { padding: 5px; border: 1px solid #ccc; text-align: center; font-size: 12px; cursor: pointer; }
+        .selected { background: #34C759 !important; color: white; }
+        #downloadSection { margin-top: 20px; border-top: 2px solid #007AFF; padding-top: 10px; }
+
+        /* New Style for Path Box */
+        .path-box { margin-top: 15px; background: #fff; padding: 10px; border-radius: 8px; border: 1px solid #eee; }
+        .path-box label { font-size: 12px; font-weight: bold; color: #555; display: block; margin-bottom: 5px; }
+        .path-box input { width: 100%; box-sizing: border-box; font-size: 12px; background: #fafafa; }
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+<h3>Tìm phim để tải bằng cách nhập tên không dấu, ngăn cách bằng dấu "-". VD: dia-nguc-doc-than</h3>
+<h4>Trong trường hợp không tìm thấy tên phim tiếng Anh có thể thử tiếng việt, hoặc lên trực tiếp <a href="https://phim.nguonc.com" target="_blank">phim.nguonc.com</a> để tìm đúng tên phim</h4>
+<div class="search-box">
+    <input type="text" id="searchInput" placeholder="Search movie slug...">
+    <button id="searchBtn">Tìm kiếm</button>
+</div>
+
+<div id="results"></div>
+
+<div id="downloadSection" class="hidden">
+    <h4>Chọn tập phim để tải</h4>
+    <div id="episodesArea" class="episodes-grid"></div>
+
+    <div class="path-box">
+        <label for="downloadPath">Thư mục tải phim về (bỏ trống sẽ mặc định theo hệ thống):</label>
+        <input type="text" id="downloadPath" placeholder="e.g. /Users/name/Movies or D:\Videos">
+        <small style="font-size: 10px; color: #999;">Bỏ trống để mặc định hệ thống</small>
+    </div>
+
+    <button id="startProcessBtn" style="margin-top:15px; width:100%; background: #ff9500;">Bắt đầu lấy file download</button>
+</div>
+
+<script src="sidepanel.js"></script>
+</body>
+</html>
