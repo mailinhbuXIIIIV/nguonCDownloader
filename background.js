@@ -17,12 +17,14 @@ let captureQueue = [];
 let capturedResults = [];
 let movieSlug = "";
 let userPath = "";
+let movieMeta = {};
 
 chrome.runtime.onMessage.addListener((message) => {
     if (message.type === "START_CAPTURE_QUEUE") {
         captureQueue = [...message.episodes];
         movieSlug = message.movieSlug;
         userPath = message.downloadPath || "";
+        movieMeta = message.metadata || {};
         capturedResults = [];
         processNextInQueue();
     }
@@ -58,10 +60,27 @@ function generateNodeScript() {
 const { spawn } = require('child_process');
 const fs = require('fs');
 const path = require('path');
+const https = require('https');
 
 const episodes = ${JSON.stringify(capturedResults, null, 2)};
+const meta = ${JSON.stringify(movieMeta, null, 2)};
 const movieSlug = "${movieSlug}";
 const userDefinedPath = "${userPath.replace(/\\/g, '\\\\')}";
+
+function downloadPoster(url, dest) {
+    if (!url) return Promise.resolve();
+    return new Promise((resolve) => {
+        const file = fs.createWriteStream(dest);
+        https.get(url, (response) => {
+            if (response.statusCode !== 200) { resolve(); return; }
+            response.pipe(file);
+            file.on('finish', () => {
+                file.close();
+                resolve();
+            });
+        }).on('error', () => resolve());
+    });
+}
 
 async function runFfmpeg(args, onProgress) {
     return new Promise((resolve) => {
@@ -77,22 +96,31 @@ async function runFfmpeg(args, onProgress) {
 async function run() {
     let totalBytes = 0;
     const baseDir = userDefinedPath ? path.resolve(userDefinedPath) : __dirname;
-    const finalDir = path.join(baseDir, movieSlug);
+    const mainDir = path.join(baseDir, movieSlug);
+    const posterDir = path.join(mainDir, "posters");
 
     console.log("==========================================");
-    console.log("STARTING DOWNLOAD: " + movieSlug);
-    console.log("SAVING TO: " + finalDir);
+    console.log("STARTING DOWNLOAD: " + (meta.title || movieSlug));
+    console.log("SAVING TO: " + mainDir);
     console.log("==========================================");
 
-    if (!fs.existsSync(finalDir)) fs.mkdirSync(finalDir, { recursive: true });
+    if (!fs.existsSync(mainDir)) fs.mkdirSync(mainDir, { recursive: true });
+    if (!fs.existsSync(posterDir)) fs.mkdirSync(posterDir, { recursive: true });
 
     for (const ep of episodes) {
         const filename = \`\${movieSlug}-\${ep.episodeName}.mp4\`;
-        const fullPath = path.join(finalDir, filename);
+        const fullPath = path.join(mainDir, filename);
+        const posterPath = path.join(posterDir, \`\${ep.episodeName}.jpg\`);
+
+        // Download poster specifically for this episode
+        if (!fs.existsSync(posterPath)) {
+            await downloadPoster(meta.thumb_url || meta.poster, posterPath);
+            process.stdout.write(\`\\r[POSTER] Saved \${ep.episodeName}.jpg\`);
+        }
 
         if (fs.existsSync(fullPath)) {
             const size = fs.statSync(fullPath).size;
-            console.log(\`[SKIP] \${filename} exists (\${(size/1024/1024).toFixed(2)} MB)\`);
+            console.log(\`\\n[SKIP] \${filename} exists (\${(size/1024/1024).toFixed(2)} MB)\`);
             totalBytes += size;
             continue;
         }
@@ -101,7 +129,6 @@ async function run() {
         
         const headers = \`User-Agent: ${ua}\\r\\nReferer: \${ep.origin}/\\r\\nOrigin: \${ep.origin}\\r\\n\`;
         
-        // Added the picker and allowed extensions back for stability
         const args = [
             '-headers', headers, 
             '-extension_picky', '0', 
@@ -115,14 +142,13 @@ async function run() {
 
         await runFfmpeg(args, (line) => {
             const sizeMatch = line.match(/size=\\s*(\\d+[a-zA-Z]+)/);
-            // Updated regex to catch the full hh:mm:ss format accurately
             const timeMatch = line.match(/time=\\s*(\\d{2}:\\d{2}:\\d{2})/);
             const speedMatch = line.match(/speed=\\s*([\\d.x]+)/);
             
             if (sizeMatch && timeMatch) {
                 const ticks = Math.floor((Date.now() / 200) % 10);
                 const bar = "[" + "=".repeat(ticks) + ">" + " ".repeat(10 - ticks) + "]";
-                process.stdout.write(\`\\r\${bar} Size: \${sizeMatch[1]} | Time: \${timeMatch[1]} | Speed: \${speedMatch ? speedMatch[1] : '??'}\`);
+                process.stdout.write(\`\\r\${bar} Ep \${ep.episodeName} | Size: \${sizeMatch[1]} | Time: \${timeMatch[1]} | Speed: \${speedMatch ? speedMatch[1] : '??'}\`);
             }
         });
 
