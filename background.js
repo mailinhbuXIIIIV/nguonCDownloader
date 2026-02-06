@@ -17,14 +17,12 @@ let captureQueue = [];
 let capturedResults = [];
 let movieSlug = "";
 let userPath = "";
-let movieMeta = {};
 
 chrome.runtime.onMessage.addListener((message) => {
     if (message.type === "START_CAPTURE_QUEUE") {
         captureQueue = [...message.episodes];
         movieSlug = message.movieSlug;
         userPath = message.downloadPath || "";
-        movieMeta = message.metadata || {};
         capturedResults = [];
         processNextInQueue();
     }
@@ -60,27 +58,10 @@ function generateNodeScript() {
 const { spawn } = require('child_process');
 const fs = require('fs');
 const path = require('path');
-const https = require('https');
 
 const episodes = ${JSON.stringify(capturedResults, null, 2)};
-const meta = ${JSON.stringify(movieMeta, null, 2)};
 const movieSlug = "${movieSlug}";
 const userDefinedPath = "${userPath.replace(/\\/g, '\\\\')}";
-
-function downloadPoster(url, dest) {
-    if (!url) return Promise.resolve();
-    return new Promise((resolve) => {
-        const file = fs.createWriteStream(dest);
-        https.get(url, (response) => {
-            response.pipe(file);
-            file.on('finish', () => {
-                file.close();
-                console.log("[POSTER] Saved poster.jpg for Jellyfin");
-                resolve();
-            });
-        }).on('error', () => resolve());
-    });
-}
 
 async function runFfmpeg(args, onProgress) {
     return new Promise((resolve) => {
@@ -98,22 +79,21 @@ async function run() {
     const baseDir = userDefinedPath ? path.resolve(userDefinedPath) : __dirname;
     const finalDir = path.join(baseDir, movieSlug);
 
-    if (!fs.existsSync(finalDir)) fs.mkdirSync(finalDir, { recursive: true });
-
     console.log("==========================================");
-    console.log("MOVIE: " + (meta.title || movieSlug));
+    console.log("STARTING DOWNLOAD: " + movieSlug);
     console.log("SAVING TO: " + finalDir);
     console.log("==========================================");
 
-    // Download poster for Jellyfin/Plex
-    await downloadPoster(meta.poster || meta.thumb_url, path.join(finalDir, "poster.jpg"));
+    if (!fs.existsSync(finalDir)) fs.mkdirSync(finalDir, { recursive: true });
 
     for (const ep of episodes) {
         const filename = \`\${movieSlug}-\${ep.episodeName}.mp4\`;
         const fullPath = path.join(finalDir, filename);
 
         if (fs.existsSync(fullPath)) {
-            console.log(\`[SKIP] \${filename} exists.\`);
+            const size = fs.statSync(fullPath).size;
+            console.log(\`[SKIP] \${filename} exists (\${(size/1024/1024).toFixed(2)} MB)\`);
+            totalBytes += size;
             continue;
         }
 
@@ -121,39 +101,42 @@ async function run() {
         
         const headers = \`User-Agent: ${ua}\\r\\nReferer: \${ep.origin}/\\r\\nOrigin: \${ep.origin}\\r\\n\`;
         
+        // Added the picker and allowed extensions back for stability
         const args = [
-            '-headers', headers,
-            '-protocol_whitelist', 'file,http,https,tcp,tls,crypto',
-            '-i', ep.url,
-            '-map', '0',
-            '-c', 'copy',
-            '-movflags', 'use_metadata_tags',
-            // Global metadata
-            '-metadata:g', \`title=\${meta.title} - \${ep.episodeName}\`,
-            '-metadata:g', \`comment=\${meta.description || ''}\`,
-            '-metadata:g', \`artist=\${meta.cast || ''}\`,
-            '-metadata:g', \`date=\${meta.year || ''}\`,
-            '-metadata:g', \`description=\${meta.description || ''}\`,
-            '-metadata:g', \`genre=TV Show\`,
-            // Stream-level metadata (helps some picky players)
-            '-metadata:s:v:0', \`title=\${meta.title} - \${ep.episodeName}\`,
-            '-metadata:s:v:0', \`comment=\${meta.description || ''}\`,
+            '-headers', headers, 
+            '-extension_picky', '0', 
+            '-allowed_extensions', 'ALL', 
+            '-protocol_whitelist', 'file,http,https,tcp,tls,crypto', 
+            '-i', ep.url, 
+            '-c', 'copy', 
             '-stats', 
             fullPath
         ];
 
         await runFfmpeg(args, (line) => {
             const sizeMatch = line.match(/size=\\s*(\\d+[a-zA-Z]+)/);
-            if (sizeMatch) {
-                process.stdout.write(\`\\r Progress: \${sizeMatch[1]}\`);
+            // Updated regex to catch the full hh:mm:ss format accurately
+            const timeMatch = line.match(/time=\\s*(\\d{2}:\\d{2}:\\d{2})/);
+            const speedMatch = line.match(/speed=\\s*([\\d.x]+)/);
+            
+            if (sizeMatch && timeMatch) {
+                const ticks = Math.floor((Date.now() / 200) % 10);
+                const bar = "[" + "=".repeat(ticks) + ">" + " ".repeat(10 - ticks) + "]";
+                process.stdout.write(\`\\r\${bar} Size: \${sizeMatch[1]} | Time: \${timeMatch[1]} | Speed: \${speedMatch ? speedMatch[1] : '??'}\`);
             }
         });
 
-        if (fs.existsSync(fullPath)) totalBytes += fs.statSync(fullPath).size;
+        if (fs.existsSync(fullPath)) {
+            const finalSize = fs.statSync(fullPath).size;
+            totalBytes += finalSize;
+            console.log(\`\\n[FINISHED] \${filename} (\${(finalSize / 1024 / 1024).toFixed(2)} MB)\`);
+        }
     }
 
     console.log("\\n" + "=".repeat(40));
-    console.log(\`DONE! Total Space: \${(totalBytes / 1024 / 1024).toFixed(2)} MB\`);
+    console.log(\`ALL DOWNLOADS COMPLETE!\`);
+    console.log(\`Total Space Used: \${(totalBytes / 1024 / 1024).toFixed(2)} MB\`);
+    
     if (process.platform === 'darwin') spawn('afplay', ['/System/Library/Sounds/Glass.aiff']);
 }
 
