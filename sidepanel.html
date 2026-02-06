@@ -29,10 +29,19 @@
     <button id="searchBtn">Tìm kiếm</button>
 </div>
 
+<div id="paginationControls" class="pagination-controls hidden">
+    <button id="prevPage">← Trước</button>
+    <span id="pageInfo" style="font-size: 13px; font-weight: bold;">Trang 1 / 1</span>
+    <button id="nextPage">Sau →</button>
+</div>
+
 <div id="results"></div>
 
 <div id="downloadSection" class="hidden">
-    <h4>Chọn tập phim để tải</h4>
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+        <h4>Chọn tập phim</h4>
+        <button id="selectAllBtn" style="background: #5856d6; font-size: 11px; padding: 4px 8px;">Chọn tất cả</button>
+    </div>
     <div id="episodesArea" class="episodes-grid"></div>
 
     <div class="path-box">
