@@ -30,6 +30,17 @@ async function loadEpisodes(slug) {
     currentMovieSlug = slug;
     const response = await fetch(`https://phim.nguonc.com/api/film/${slug}`);
     const data = await response.json();
+
+    // Store the full movie metadata
+    currentMovieMetadata = {
+        title: data.movie.name,
+        original_title: data.movie.original_name,
+        description: data.movie.description,
+        year: data.movie.category["3"]?.list[0]?.name || "",
+        director: data.movie.director,
+        cast: data.movie.casts,
+        poster: data.movie.poster_url
+    };
     const episodes = data.movie.episodes[0].items;
 
     const area = document.getElementById('episodesArea');
@@ -56,14 +67,13 @@ async function loadEpisodes(slug) {
 
 document.getElementById('startProcessBtn').addEventListener('click', () => {
     if (selectedEpisodes.length === 0) return alert("Select episodes first!");
-
-    // GET THE PATH VALUE
     const customPath = document.getElementById('downloadPath').value.trim();
 
     chrome.runtime.sendMessage({
         type: "START_CAPTURE_QUEUE",
         episodes: selectedEpisodes,
         movieSlug: currentMovieSlug,
-        downloadPath: customPath // Sending the path to background.js
+        downloadPath: customPath,
+        metadata: currentMovieMetadata // Send metadata to background
     });
 });
