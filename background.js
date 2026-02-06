@@ -129,13 +129,21 @@ async function run() {
         
         const headers = \`User-Agent: ${ua}\\r\\nReferer: \${ep.origin}/\\r\\nOrigin: \${ep.origin}\\r\\n\`;
         
+        // Use backticks for complex metadata strings to avoid quote breaking
         const args = [
             '-headers', headers, 
             '-extension_picky', '0', 
             '-allowed_extensions', 'ALL', 
-            '-protocol_whitelist', 'file,http,https,tcp,tls,crypto', 
+            '-protocol_whitelist', 'file,http,https,tcp,tls,crypto',
             '-i', ep.url, 
+            '-map', '0',
             '-c', 'copy', 
+            '-movflags', 'use_metadata_tags',
+            '-metadata', \`title=\${meta.title || movieSlug} - Tập \${ep.episodeName}\`,
+            '-metadata', \`date=\${meta.year || ''}\`,
+            '-metadata', \`comment=\${meta.description || ''}\`,
+            '-metadata', \`artist=\${meta.cast || ''}\`,
+            '-metadata', \`genre=Reality-TV\`, 
             '-stats', 
             fullPath
         ];
